@@ -147,26 +147,55 @@ def any_red_20_20(map_grid, robot_direction, robot_x, robot_y):
                 return True  # Przed robotem jest przeszkoda
     return False
 
-# Funkcja aktualizacji mapy na podstawie widoku robota
+# # Funkcja aktualizacji mapy na podstawie widoku robota
+# def update_map(detection, robot_x, robot_y, robot_direction, map_grid):
+#     for dx in range(-10, 10):
+#         for dy in range(0, 20):  # Robot widzi tylko do przodu
+#             angle_rad = np.radians(robot_direction)
+#             #x_offset = int(dx * np.cos(angle_rad) - dy * np.sin(angle_rad))
+#             #y_offset = int(dx * np.sin(angle_rad) + dy * np.cos(angle_rad))
+#             x_offset = int(dy * np.cos(angle_rad) - dx * np.sin(angle_rad))
+#             y_offset = int(dy * np.sin(angle_rad) + dx * np.cos(angle_rad))
+
+#             cell_x = robot_x + x_offset
+#             cell_y = robot_y + y_offset
+
+#             if detection < 0.175:  # Podłoga (zielona)
+#                 map_grid[cell_x, cell_y] = 0  # Oznacz jako podłogę
+#             elif 0.175 <= detection < 2.05:  # Obszar do sprawdzenia (żółty)
+#                 if map_grid[cell_x, cell_y] >= 1 and map_grid[cell_x, cell_y] < 4:
+#                     map_grid[cell_x, cell_y] += 1  # Zwiększ poziom żółtego
+#                 elif map_grid[cell_x, cell_y] == -1:
+#                     map_grid[cell_x, cell_y] = 1  # Pierwsze wykrycie jako "do sprawdzenia"
+#             else:  # Przeszkoda (czerwony)
+#                 map_grid[cell_x, cell_y] = 5  # Oznacz jako trwałą przeszkodę
+                
+                
 def update_map(detection, robot_x, robot_y, robot_direction, map_grid):
-    for dx in range(-10, 10):
-        for dy in range(0, 20):  # Robot widzi tylko do przodu
-            angle_rad = np.radians(robot_direction)
+    angle_rad = np.radians(robot_direction)
+
+    for dx in range(-10, 10):   # dx = lewo/prawo
+        for dy in range(0, 20): # dy = przód/tył
+            # Transformacja (lx, ly) -> (global_x, global_y)
+            #  tu: 0° => jedź w górę = rosnące global_y
+
             x_offset = int(dx * np.cos(angle_rad) - dy * np.sin(angle_rad))
             y_offset = int(dx * np.sin(angle_rad) + dy * np.cos(angle_rad))
 
-            cell_x = robot_x + x_offset
-            cell_y = robot_y + y_offset
+            # W map_grid:  map_grid[row=y, col=x]
+            cell_x = int(robot_x + x_offset)
+            cell_y = int(robot_y + y_offset)
 
-            if detection < 0.175:  # Podłoga (zielona)
-                map_grid[cell_x, cell_y] = 0  # Oznacz jako podłogę
-            elif 0.175 <= detection < 2.05:  # Obszar do sprawdzenia (żółty)
-                if map_grid[cell_x, cell_y] >= 1 and map_grid[cell_x, cell_y] < 4:
-                    map_grid[cell_x, cell_y] += 1  # Zwiększ poziom żółtego
-                elif map_grid[cell_x, cell_y] == -1:
-                    map_grid[cell_x, cell_y] = 1  # Pierwsze wykrycie jako "do sprawdzenia"
-            else:  # Przeszkoda (czerwony)
-                map_grid[cell_x, cell_y] = 5  # Oznacz jako trwałą przeszkodę
+            # Uwaga: zapisy do map_grid[y, x] => map_grid[cell_y, cell_x]
+            if detection < 0.175:
+                map_grid[cell_y, cell_x] = 0
+            elif 0.175 <= detection < 2.05:
+                if 1 <= map_grid[cell_y, cell_x] < 4:
+                    map_grid[cell_y, cell_x] += 1
+                elif map_grid[cell_y, cell_x] == -1:
+                    map_grid[cell_y, cell_x] = 1
+            else:
+                map_grid[cell_y, cell_x] = 5
 
 def move_forward(robot, speed):
     """
@@ -212,6 +241,5 @@ def turn_by_angle(robot, angle, turn_speed=0.2):
     time.sleep(turn_time)
     robot.left_motor.value = 0
     robot.right_motor.value = 0
-
-    print(f"Obrót o {angle}° zakończony w czasie {turn_time:.2f} sekundy (prędkość: {turn_speed}).")
+    #print(f"Obrót o {angle}° zakończony w czasie {turn_time:.2f} sekundy (prędkość: {turn_speed}).")
 
