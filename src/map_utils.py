@@ -3,13 +3,6 @@ import numpy as np
 from jetbot import bgr8_to_jpeg
 
 class MapProvider(traitlets.HasTraits):
-    """
-    English: A class that provides a map image in JPEG bytes form as a trait
-    that can be linked to a Jupyter widgets.Image.
-    
-    Polski: Klasa zapewniająca obraz mapy (w bajtach JPEG) jako trait
-    (wartość cechy traitlets), którą można połączyć (link) z widgets.Image.
-    """
     value = traitlets.Bytes()
 
     def __init__(self, map_size):
@@ -19,20 +12,20 @@ class MapProvider(traitlets.HasTraits):
         self.robot_x = map_size / 2
         self.robot_y = map_size / 2
         self.map_grid = np.zeros((self.map_size, self.map_size), dtype=int)
-        self._color_map = {
-            -1: [169, 169, 169],  # Szary - nieznane
-             0: [0, 255, 0],      # Zielony - podłoga
-             1: [255, 250, 205],  # Bardzo jasnożółty
-             2: [255, 215, 0],    # Żółty
-             3: [255, 165, 0],    # Pomarańczowy
-             4: [255, 140, 0],    # Ciemnopomarańczowy
-             5: [255, 0, 0]       # Czerwony - przeszkoda
-        }
+        self.lut = np.array([
+            [169, 169, 169],  # index 0 => dla map_grid == -1
+            [0,   255, 0],    # index 1 => dla map_grid ==  0
+            [255, 200, 50],  # index 2 => dla map_grid ==  1
+            [255, 165, 20],   # index 3 => dla map_grid ==  2
+            [255, 140, 0],    # index 4 => dla map_grid ==  3
+            [255, 100, 0],    # index 5 => dla map_grid ==  4
+            [255, 0,   0],    # index 6 => dla map_grid ==  5
+        ], dtype=np.uint8)
         
         # Tworzymy początkowy obraz (wartości w self.value)
         self.update_map()
         
-    def _draw_robot_circle(self, img, radius=3, color=(255, 0, 0)):
+    def _draw_robot(self, img, radius=6, color=(255, 0, 0)):
         height, width, _ = img.shape
         for dy in range(-radius, radius + 1):
             for dx in range(-radius, radius + 1):
@@ -45,38 +38,48 @@ class MapProvider(traitlets.HasTraits):
                         img[py, px] = color
 
     def update_map(self):
-        """
-        English: Updates the self.value Bytes trait with a new JPEG image
-        created from the current map_grid and robot position.
-        
-        Polski: Aktualizuje atrybut self.value (typ Bytes) nowym obrazem JPEG
-        wygenerowanym z obecnej siatki mapy (map_grid) i pozycji robota.
-        """
-        # Tworzymy pustą tablicę (BGR8)
-        img = np.zeros((self.map_size, self.map_size, 3), dtype=np.uint8)
-        # Uzupełniamy ją kolorami w zależności od map_grid
-        for y in range(self.map_size):
-            for x in range(self.map_size):
-                value = self.map_grid[x, y]
-                img[y, x] = self._color_map.get(value)
-        self._draw_robot_circle(img)
+        # 1) Obliczamy indeksy do tablicy LUT
+        indices = self.map_grid + 1  # -1 -> 0, 0 -> 1, ..., 5 -> 6
+        # 2) Pobieramy kolory w trybie wektorowym
+        img = self.lut[indices]      # shape => (map_size, map_size, 3)
+        # 3) Rysujemy pozycję robota (bez OpenCV)
+        self._draw_robot(img)
+        # 4) Odwracamy pionowo, jeśli chcesz mieć (0,0) na dole
         img = np.flipud(img)
-        # Kodujemy do JPEG i zapisujemy do self.value
+        # 5) Kodujemy do JPEG
         self.value = bgr8_to_jpeg(img)
 
     def set_map(self, map_grid):
-        """
-        English: Set a new map grid and update the displayed image.
-        Polski: Ustawia nową siatkę mapy i aktualizuje wyświetlany obraz.
-        """
         self.map_grid = map_grid
         self.update_map()
     
     def set_robot_pos(self, x, y):
-        """
-        English: Set a new robot position (x,y) and update the displayed image.
-        Polski: Ustawia nową pozycję robota (x,y) i aktualizuje wyświetlany obraz.
-        """
-        self.robot_x = y
-        self.robot_y = x
+        self.robot_x = x
+        self.robot_y = y
         self.update_map()
+        
+    def update_map_grid(self, detection, robot_x, robot_y, robot_direction, map_grid):
+        angle_rad = np.radians(robot_direction)
+
+        for dx in range(-10, 10):   # dx = lewo/prawo
+            for dy in range(0, 20): # dy = przód/tył
+                # Transformacja (lx, ly) -> (global_x, global_y)
+                #  tu: 0° => jedź w górę = rosnące global_y
+
+                x_offset = int(dx * np.cos(angle_rad) - dy * np.sin(angle_rad))
+                y_offset = int(dx * np.sin(angle_rad) + dy * np.cos(angle_rad))
+
+                # W map_grid:  map_grid[row=y, col=x]
+                cell_x = int(robot_x + x_offset)
+                cell_y = int(robot_y + y_offset)
+
+                # Uwaga: zapisy do map_grid[y, x] => map_grid[cell_y, cell_x]
+                if detection < 0.175:
+                    map_grid[cell_y, cell_x] = 0
+                elif 0.175 <= detection < 2.05:
+                    if 1 <= map_grid[cell_y, cell_x] < 4:
+                        map_grid[cell_y, cell_x] += 1
+                    elif map_grid[cell_y, cell_x] == -1:
+                        map_grid[cell_y, cell_x] = 1
+                else:
+                    map_grid[cell_y, cell_x] = 5

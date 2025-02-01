@@ -67,55 +67,6 @@ def measure_speed_with_correction(robot, distance_meters, speed=0.5, correction=
     print(f"Zmierzona prędkość: {measured_speed:.2f} m/s")
     return measured_speed
 
-
-def draw_map(robot_x, robot_y, map_grid, map_size):
-    color_map = {
-        -1: [169, 169, 169],  # Szary - nieznane
-         0: [0, 255, 0],      # Zielony - podłoga
-         1: [255, 250, 205],  # Bardzo jasnożółty
-         2: [255, 215, 0],    # Żółty
-         3: [255, 165, 0],    # Pomarańczowy
-         4: [255, 140, 0],    # Ciemnopomarańczowy
-         5: [255, 0, 0]       # Czerwony - przeszkoda
-    }
-    img = np.zeros((map_size, map_size, 3), dtype=np.uint8)
-
-    for x in range(map_size):
-        for y in range(map_size):
-            value = map_grid[x, y]
-            img[x, y] = color_map.get(value, [169, 169, 169])  # Domyślnie szary
-
-    plt.figure(figsize=(16, 16))
-
-    # Rysowanie mapy
-    plt.imshow(img, origin='lower')
-
-    # Dodanie siatki (cienkie białe linie)
-    #plt.grid(visible=True, color='white', linewidth=0.5)
-    #plt.xticks([])
-    #plt.yticks([])
-
-    # Zaznaczenie pozycji robota jako niebieski punkt
-    plt.scatter(robot_y, robot_x, c='blue', s=50, edgecolors='black', label="Robot")
-
-    # Legenda
-    legend_patches = [
-        plt.Line2D([0], [0], marker='s', color='w', markerfacecolor=np.array(color_map[i]) / 255, markersize=10, label=desc)
-        for i, desc in {
-            -1: "Nieznane",
-             0: "Podłoga",
-             1: "Do sprawdzenia",
-             2: "Do sprawdzenia",
-             3: "Do sprawdzenia",
-             4: "Do sprawdzenia",
-             5: "Przeszkoda"
-        }.items()
-    ]
-
-    plt.legend(handles=legend_patches, loc='upper right', fontsize=10)
-    plt.title("Mapa eksploracji", fontsize=14, fontweight='bold')
-    plt.show()
-    
     
 def is_floor(image, model, device, floor_prototype):
     # Przekształcenie fragmentu na embedding
@@ -146,57 +97,7 @@ def any_red_20_20(map_grid, robot_direction, robot_x, robot_y):
             if map_grid[cell_x, cell_y] == 5:  # Przeszkoda wykryta
                 return True  # Przed robotem jest przeszkoda
     return False
-
-# # Funkcja aktualizacji mapy na podstawie widoku robota
-# def update_map(detection, robot_x, robot_y, robot_direction, map_grid):
-#     for dx in range(-10, 10):
-#         for dy in range(0, 20):  # Robot widzi tylko do przodu
-#             angle_rad = np.radians(robot_direction)
-#             #x_offset = int(dx * np.cos(angle_rad) - dy * np.sin(angle_rad))
-#             #y_offset = int(dx * np.sin(angle_rad) + dy * np.cos(angle_rad))
-#             x_offset = int(dy * np.cos(angle_rad) - dx * np.sin(angle_rad))
-#             y_offset = int(dy * np.sin(angle_rad) + dx * np.cos(angle_rad))
-
-#             cell_x = robot_x + x_offset
-#             cell_y = robot_y + y_offset
-
-#             if detection < 0.175:  # Podłoga (zielona)
-#                 map_grid[cell_x, cell_y] = 0  # Oznacz jako podłogę
-#             elif 0.175 <= detection < 2.05:  # Obszar do sprawdzenia (żółty)
-#                 if map_grid[cell_x, cell_y] >= 1 and map_grid[cell_x, cell_y] < 4:
-#                     map_grid[cell_x, cell_y] += 1  # Zwiększ poziom żółtego
-#                 elif map_grid[cell_x, cell_y] == -1:
-#                     map_grid[cell_x, cell_y] = 1  # Pierwsze wykrycie jako "do sprawdzenia"
-#             else:  # Przeszkoda (czerwony)
-#                 map_grid[cell_x, cell_y] = 5  # Oznacz jako trwałą przeszkodę
                 
-                
-def update_map(detection, robot_x, robot_y, robot_direction, map_grid):
-    angle_rad = np.radians(robot_direction)
-
-    for dx in range(-10, 10):   # dx = lewo/prawo
-        for dy in range(0, 20): # dy = przód/tył
-            # Transformacja (lx, ly) -> (global_x, global_y)
-            #  tu: 0° => jedź w górę = rosnące global_y
-
-            x_offset = int(dx * np.cos(angle_rad) - dy * np.sin(angle_rad))
-            y_offset = int(dx * np.sin(angle_rad) + dy * np.cos(angle_rad))
-
-            # W map_grid:  map_grid[row=y, col=x]
-            cell_x = int(robot_x + x_offset)
-            cell_y = int(robot_y + y_offset)
-
-            # Uwaga: zapisy do map_grid[y, x] => map_grid[cell_y, cell_x]
-            if detection < 0.175:
-                map_grid[cell_y, cell_x] = 0
-            elif 0.175 <= detection < 2.05:
-                if 1 <= map_grid[cell_y, cell_x] < 4:
-                    map_grid[cell_y, cell_x] += 1
-                elif map_grid[cell_y, cell_x] == -1:
-                    map_grid[cell_y, cell_x] = 1
-            else:
-                map_grid[cell_y, cell_x] = 5
-
 def move_forward(robot, speed):
     """
     Porusza robotem do przodu.
